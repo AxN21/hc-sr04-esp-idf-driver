@@ -14,3 +14,9 @@ This is a simple open-source driver for the HC-SR04 ultrasonic distance sensor, 
 ## Example
 - You can check out a simple example in the `examples/basic_examples/`
 
+## TODO:
+- Use Interrupts instead of Polling
+- Use FreeRTOS Tasks for Asynchronous Operations
+- Implement State Machines for Driver Logic
+- Add Dynamic Memory Management
+
