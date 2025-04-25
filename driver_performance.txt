@@ -1,0 +1,13 @@
+With the current implementation it takes a consistant 4127 us, that takes into account Triggering, reading the echo pin and calculating the distance
+
+The CPU usage is the following:
+Task Name       Runtime Percentage
+main            2755366         1%
+IDLE1           265069962               99%
+IDLE0           262314621               98%
+ipc1            20338           <1%
+ipc0            19517           <1%
+
+what does it mean?
+the main application is using 1% of the CPU, which stays in IDLE mode 99% of the time
+the ipc1 and ipc0 comes from the FreeRTOS that is in charge of syncronizing the two cores
