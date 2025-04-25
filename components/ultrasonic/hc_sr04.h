@@ -9,6 +9,10 @@
 extern "C" {
 #endif
 
+#define ESP_ERR_HC_SR04_PING         0x200
+#define ESP_ERR_HC_SR04_PING_TIMEOUT 0x201
+#define ESP_ERR_HC_SR04_ECHO_TIMEOUT 0x202
+
 /**
  * @brief HC-SR04 sensor descriptor
  */

@@ -9,17 +9,23 @@
 // Speed of sound in cm/µs (343 m/s = 0.0343 cm/µs)
 #define ROUNDTRIP_M 5800.0f
 #define ROUNDTRIP_CM 58
+#define PING_TIMEOUT 6000
 
 static portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED;
 #define PORT_ENTER_CRITICAL portENTER_CRITICAL(&mux);
 #define PORT_EXIT_CRITICAL portEXIT_CRITICAL(&mux);
 
+#define timeout_expired(start, len) ((esp_timer_get_time() - (start)) >= (len))
+
+#define CHECK_ARG(VAL) do { if (!(VAL)) return ESP_ERR_INVALID_ARG; } while (0)
+#define CHECK(x) do { esp_err_t __; if ((__ = x) != ESP_OK) return __; } while (0)
+#define RETURN_CRITICAL(RES) do { PORT_EXIT_CRITICAL; return RES; } while (0)
+
+
 
 esp_err_t hc_sr04_init(const hc_sr04_t *sensor) {
-    if (!sensor) {
-        ESP_LOGE(TAG, "Sensor descriptor is NULL");
-        return ESP_ERR_INVALID_ARG;
-    }
+
+    CHECK_ARG(sensor);
 
     // Configure the trigger pin as output
     gpio_config_t trig_config = {
@@ -49,35 +55,33 @@ esp_err_t hc_sr04_init(const hc_sr04_t *sensor) {
 }
 
 esp_err_t hc_sr04_measure_raw(const hc_sr04_t *sensor, uint32_t max_time_us, uint32_t *time_us) {
-    if (!sensor || !time_us) {
-        ESP_LOGE(TAG, "Invalid Arguments");
-        return ESP_ERR_INVALID_ARG;
-    }
+
+    CHECK_ARG(sensor && time_us);
 
     PORT_ENTER_CRITICAL;
 
     // Send a 10 us HIGH pulse on the trigger pin
-    gpio_set_level(sensor->trigger_pin, 1);
+    CHECK(gpio_set_level(sensor->trigger_pin, 1));
     esp_rom_delay_us(10);
-    gpio_set_level(sensor->trigger_pin, 0);
+    CHECK(gpio_set_level(sensor->trigger_pin, 0));
 
+    // Previous ping did not end
+    if (gpio_get_level(sensor->echo_pin))
+        RETURN_CRITICAL(ESP_ERR_HC_SR04_PING);
+    
     int64_t start = esp_timer_get_time();
-    while (gpio_get_level(sensor->echo_pin) == 0) {
-        if (esp_timer_get_time() - start > 1000000) {
-            ESP_LOGE(TAG, "Echo signal timeout (no HIGH detected)");
-            return ESP_ERR_TIMEOUT;
-        }
+    while (!gpio_get_level(sensor->echo_pin)) {
+        if (timeout_expired(start, PING_TIMEOUT))
+            RETURN_CRITICAL(ESP_ERR_HC_SR04_PING_TIMEOUT);
     }
-
+    
     // Get echo measuring
     int64_t echo_start = esp_timer_get_time();
     int64_t time = echo_start;
-    while (gpio_get_level(sensor->echo_pin) == 1) {
+    while(!gpio_get_level(sensor->echo_pin)) {
         time = esp_timer_get_time();
-        if (esp_timer_get_time() - echo_start > 1000000) {
-            ESP_LOGE(TAG, "Echo signam timeout no LOW detected");
-            return ESP_ERR_TIMEOUT;
-        }
+        if (timeout_expired(echo_start, max_time_us))
+            RETURN_CRITICAL(ESP_ERR_HC_SR04_ECHO_TIMEOUT);
     }
     PORT_EXIT_CRITICAL;
 
@@ -87,16 +91,11 @@ esp_err_t hc_sr04_measure_raw(const hc_sr04_t *sensor, uint32_t max_time_us, uin
 
 
 esp_err_t hc_sr04_measure_cm(const hc_sr04_t *sensor, float max_distance, float *distance_cm) {
-    if (!sensor || !distance_cm) {
-        ESP_LOGE(TAG, "Invalid arguments");
-        return ESP_ERR_INVALID_ARG;
-    }
+
+    CHECK_ARG(sensor && distance_cm);
 
     uint32_t time_us;
-    if(hc_sr04_measure_raw(sensor, max_distance * ROUNDTRIP_CM, &time_us) != ESP_OK) {
-        ESP_LOGE(TAG, "Measurement in meters failed");
-        return ESP_ERR_TIMEOUT;
-    }
+    CHECK(hc_sr04_measure_raw(sensor, max_distance * ROUNDTRIP_CM, &time_us));
     *distance_cm = time_us / ROUNDTRIP_CM;
 
     ESP_LOGI(TAG, "Measured Distance: %.2f cm", *distance_cm);
@@ -104,18 +103,11 @@ esp_err_t hc_sr04_measure_cm(const hc_sr04_t *sensor, float max_distance, float 
 }
 
 esp_err_t hc_sr04_measure_m(const hc_sr04_t *sensor,float max_distance, float *distance_m) {
-    if (!sensor || !distance_m) {
-        ESP_LOGE(TAG, "Invalid arguments");
-        return ESP_ERR_INVALID_ARG;
-    }
+    CHECK_ARG(sensor && distance_m);
 
     uint32_t time_us;
-    if(hc_sr04_measure_raw(sensor, max_distance * ROUNDTRIP_M, &time_us) != ESP_OK) {
-        ESP_LOGE(TAG, "Measurement in meters failed");
-        return ESP_ERR_TIMEOUT;
-    }
+    CHECK(hc_sr04_measure_raw(sensor, max_distance * ROUNDTRIP_M, &time_us));
     *distance_m = time_us / ROUNDTRIP_M;
-
 
     ESP_LOGI(TAG, "Measured Distance: %.3f meters", *distance_m);
     return ESP_OK;
