@@ -1,11 +1,19 @@
 #include "hc_sr04.h"
 #include "esp_timer.h"
 #include "esp_log.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/portmacro.h"
 
 #define TAG "HC-SR04"
 
 // Speed of sound in cm/µs (343 m/s = 0.0343 cm/µs)
-#define SOUND_SPEED_CM_PER_US 0.0343
+#define ROUNDTRIP_M 5800.0f
+#define ROUNDTRIP_CM 58
+
+static portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED;
+#define PORT_ENTER_CRITICAL portENTER_CRITICAL(&mux);
+#define PORT_EXIT_CRITICAL portEXIT_CRITICAL(&mux);
+
 
 esp_err_t hc_sr04_init(const hc_sr04_t *sensor) {
     if (!sensor) {
@@ -40,11 +48,13 @@ esp_err_t hc_sr04_init(const hc_sr04_t *sensor) {
     return ESP_OK;
 }
 
-esp_err_t hc_sr04_measure_raw(const hc_sr04_t *sensor, uint32_t *time_us) {
+esp_err_t hc_sr04_measure_raw(const hc_sr04_t *sensor, uint32_t max_time_us, uint32_t *time_us) {
     if (!sensor || !time_us) {
         ESP_LOGE(TAG, "Invalid Arguments");
         return ESP_ERR_INVALID_ARG;
     }
+
+    PORT_ENTER_CRITICAL;
 
     // Send a 10 us HIGH pulse on the trigger pin
     gpio_set_level(sensor->trigger_pin, 1);
@@ -69,82 +79,43 @@ esp_err_t hc_sr04_measure_raw(const hc_sr04_t *sensor, uint32_t *time_us) {
             return ESP_ERR_TIMEOUT;
         }
     }
+    PORT_EXIT_CRITICAL;
+
     *time_us = time - echo_start;
     return ESP_OK;
 }
 
 
-esp_err_t hc_sr04_measure_cm(const hc_sr04_t *sensor, float *distance_cm) {
+esp_err_t hc_sr04_measure_cm(const hc_sr04_t *sensor, float max_distance, float *distance_cm) {
     if (!sensor || !distance_cm) {
         ESP_LOGE(TAG, "Invalid arguments");
         return ESP_ERR_INVALID_ARG;
     }
 
-    // Send a 10 µs HIGH pulse on the trigger pin
-    gpio_set_level(sensor->trigger_pin, 1);
-    esp_rom_delay_us(10);
-    gpio_set_level(sensor->trigger_pin, 0);
-
-    // Wait for the echo signal
-    int64_t start_time = esp_timer_get_time();
-    while (gpio_get_level(sensor->echo_pin) == 0) {
-        if (esp_timer_get_time() - start_time > 1000000) {  // Timeout after 1 second
-            ESP_LOGE(TAG, "Echo signal timeout (no HIGH detected)");
-            return ESP_ERR_TIMEOUT;
-        }
+    uint32_t time_us;
+    if(hc_sr04_measure_raw(sensor, max_distance * ROUNDTRIP_CM, &time_us) != ESP_OK) {
+        ESP_LOGE(TAG, "Measurement in meters failed");
+        return ESP_ERR_TIMEOUT;
     }
-
-    // Measure the distance in centimeters
-    int64_t echo_start = esp_timer_get_time();
-    while (gpio_get_level(sensor->echo_pin) == 1) {
-        if (esp_timer_get_time() - echo_start > 1000000) {  // Timeout after 1 second
-            ESP_LOGE(TAG, "Echo signal timeout (no LOW detected)");
-            return ESP_ERR_TIMEOUT;
-        }
-    }
-    int64_t echo_end = esp_timer_get_time();
-
-    // Calculate distance (cm)
-    int64_t duration_us = echo_end - echo_start;
-    *distance_cm = (duration_us * SOUND_SPEED_CM_PER_US) / 2.0;
+    *distance_cm = time_us / ROUNDTRIP_CM;
 
     ESP_LOGI(TAG, "Measured Distance: %.2f cm", *distance_cm);
     return ESP_OK;
 }
 
-esp_err_t hc_sr04_measure_m(const hc_sr04_t *sensor, float *distance_m) {
+esp_err_t hc_sr04_measure_m(const hc_sr04_t *sensor,float max_distance, float *distance_m) {
     if (!sensor || !distance_m) {
         ESP_LOGE(TAG, "Invalid arguments");
         return ESP_ERR_INVALID_ARG;
     }
 
-    // Send a 10 µs HIGH pulse on the trigger pin
-    gpio_set_level(sensor->trigger_pin, 1);
-    esp_rom_delay_us(10);
-    gpio_set_level(sensor->trigger_pin, 0);
-
-    // Wait for the measurement to complete
-    // Wait for the echo signal
-    int64_t start_time = esp_timer_get_time();
-    while (gpio_get_level(sensor->echo_pin) == 0) {
-        if (esp_timer_get_time() - start_time > 1000000) {  // Timeout after 1 second
-            ESP_LOGE(TAG, "Echo signal timeout (no HIGH detected)");
-            return ESP_ERR_TIMEOUT;
-        }
+    uint32_t time_us;
+    if(hc_sr04_measure_raw(sensor, max_distance * ROUNDTRIP_M, &time_us) != ESP_OK) {
+        ESP_LOGE(TAG, "Measurement in meters failed");
+        return ESP_ERR_TIMEOUT;
     }
+    *distance_m = time_us / ROUNDTRIP_M;
 
-    // Measure the distance in centimeters
-    int64_t echo_start = esp_timer_get_time();
-    while (gpio_get_level(sensor->echo_pin) == 1) {
-        if (esp_timer_get_time() - echo_start > 1000000) {  // Timeout after 1 second
-            ESP_LOGE(TAG, "Echo signal timeout (no LOW detected)");
-            return ESP_ERR_TIMEOUT;
-        }
-    }
-    int64_t echo_end = esp_timer_get_time();
-
-    int64_t duration_us = echo_end - echo_start;
-    *distance_m = (duration_us * SOUND_SPEED_CM_PER_US) / 2.0 / 100.0; // Convert cm to meters
 
     ESP_LOGI(TAG, "Measured Distance: %.3f meters", *distance_m);
     return ESP_OK;

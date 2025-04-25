@@ -29,28 +29,31 @@ esp_err_t hc_sr04_init(const hc_sr04_t *sensor);
  * @brief Measure time between ping and echo
  * 
  * @param sensor Pointer to the HC-SR04 sensor descriptor
+ * @param max_time_us Max time to wait for the echo
  * @param[out] time_us Time us
  * @return esp_err_t ESP_OK on success, ESP_FAIL on failure
  */
-esp_err_t hc_sr04_measure_raw(const hc_sr04_t *sensor, uint32_t *time_us);
+esp_err_t hc_sr04_measure_raw(const hc_sr04_t *sensor, uint32_t max_time_us, uint32_t *time_us);
 
 /**
  * @brief Measure distance in meters
  * 
  * @param sensor Pointer to the sensor descriptor
+ * @param max_distance Max distance to measure
  * @param[out] distance Distance in meters
  * @return esp_err_t ESP_OK on success, ESP_FAIL on failure 
  */
-esp_err_t hc_sr04_measure_m(const hc_sr04_t *sensor, float *distance);
+esp_err_t hc_sr04_measure_m(const hc_sr04_t *sensor, float max_distance, float *distance);
 
  /**
   * @brief Measure distance in centimeters
   * 
   * @param sensor Pointer to the sensor descriptor
+  * @param max_distance Max distance to measure
   * @param[out] distance Distance in meters
   * @return esp_err_t ESP_OK on success, ESP_FAIL on failure
   */
-esp_err_t hc_sr04_measure_cm(const hc_sr04_t *sensor, float *distance);
+esp_err_t hc_sr04_measure_cm(const hc_sr04_t *sensor, float max_distance, float *distance);
 
 
 

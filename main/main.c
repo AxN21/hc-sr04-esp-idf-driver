@@ -4,6 +4,8 @@
 #include "esp_log.h"
 #include "esp_timer.h"
 
+#define MAX_DISTANCE_CM 500 // 5m max
+
 #define TRIGGER_PIN 4
 #define ECHO_PIN 5
 
@@ -39,12 +41,11 @@ void app_main(void) {
         int64_t start_time = esp_timer_get_time();
         float distance_cm = 0;
         float distance_m = 0;
-        uint32_t raw_time_us = 0;
 
         ESP_LOGI("APP", "Triggering sensor...");
 
         // Measure distance in centimeters
-        if (hc_sr04_measure_cm(&sensor, &distance_cm) == ESP_OK) {
+        if (hc_sr04_measure_cm(&sensor, MAX_DISTANCE_CM, &distance_cm) == ESP_OK) {
             int64_t end_time = esp_timer_get_time();
             ESP_LOGI("APP", "Distance: %.2f cm, Time: %lld us", distance_cm, end_time - start_time);
         } else {
@@ -52,17 +53,10 @@ void app_main(void) {
         }
 
         // Measure distance in meters
-        if (hc_sr04_measure_m(&sensor, &distance_m) == ESP_OK) {
+        if (hc_sr04_measure_m(&sensor, MAX_DISTANCE_CM, &distance_m) == ESP_OK) {
             ESP_LOGI("APP", "Distance: %.3f meters", distance_m);
         } else {
             ESP_LOGE("APP", "Failed to measure distance in meters");
-        }
-
-        // Measure raw echo time in microseconds
-        if (hc_sr04_measure_raw(&sensor, &raw_time_us) == ESP_OK) {
-            ESP_LOGI("APP", "Raw echo time: %u us", raw_time_us);
-        } else {
-            ESP_LOGE("APP", "Failed to measure raw echo time");
         }
 
         // Log memory usage
