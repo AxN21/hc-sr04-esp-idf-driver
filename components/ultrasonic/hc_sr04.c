@@ -6,10 +6,11 @@
 
 #define TAG "HC-SR04"
 
-// Speed of sound in cm/µs (343 m/s = 0.0343 cm/µs)
 #define ROUNDTRIP_M 5800.0f
 #define ROUNDTRIP_CM 58
 #define PING_TIMEOUT 6000
+#define TRIGGER_LOW_DELAY 4
+#define TRIGGER_HIGH_DELAY 10
 
 static portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED;
 #define PORT_ENTER_CRITICAL portENTER_CRITICAL(&mux);
@@ -60,9 +61,11 @@ esp_err_t hc_sr04_measure_raw(const hc_sr04_t *sensor, uint32_t max_time_us, uin
 
     PORT_ENTER_CRITICAL;
 
-    // Send a 10 us HIGH pulse on the trigger pin
+    // Ping: Low for 2..4us and then high 10us
+    CHECK(gpio_set_level(sensor->trigger_pin, 0));
+    ets_dalay_us(TRIGGER_LOW_DELAY);
     CHECK(gpio_set_level(sensor->trigger_pin, 1));
-    esp_rom_delay_us(10);
+    ets_delay_us(TRIGGER_HIGH_DELAY);
     CHECK(gpio_set_level(sensor->trigger_pin, 0));
 
     // Previous ping did not end
