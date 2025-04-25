@@ -15,8 +15,6 @@ void vApplicationTickHook(void) {
     // For runtime statistics, FreeRTOS will handle the details internally
 }
 
-
-
 void log_cpu_usage(void) {
     // Get runtime stats for all tasks
     vTaskGetRunTimeStats(stats_buffer);
@@ -24,7 +22,6 @@ void log_cpu_usage(void) {
     // Print the stats to the console
     ESP_LOGI("CPU", "\nTask Name\tRuntime\tPercentage\n%s", stats_buffer);
 }
-
 
 void app_main(void) {
     hc_sr04_t sensor = {
@@ -41,15 +38,34 @@ void app_main(void) {
     while (1) {
         int64_t start_time = esp_timer_get_time();
         float distance_cm = 0;
+        float distance_m = 0;
+        uint32_t raw_time_us = 0;
 
         ESP_LOGI("APP", "Triggering sensor...");
-        if (hc_sr04_measure(&sensor, &distance_cm) == ESP_OK) {
+
+        // Measure distance in centimeters
+        if (hc_sr04_measure_cm(&sensor, &distance_cm) == ESP_OK) {
             int64_t end_time = esp_timer_get_time();
             ESP_LOGI("APP", "Distance: %.2f cm, Time: %lld us", distance_cm, end_time - start_time);
         } else {
-            ESP_LOGE("APP", "Failed to measure distance");
+            ESP_LOGE("APP", "Failed to measure distance in cm");
         }
 
+        // Measure distance in meters
+        if (hc_sr04_measure_m(&sensor, &distance_m) == ESP_OK) {
+            ESP_LOGI("APP", "Distance: %.3f meters", distance_m);
+        } else {
+            ESP_LOGE("APP", "Failed to measure distance in meters");
+        }
+
+        // Measure raw echo time in microseconds
+        if (hc_sr04_measure_raw(&sensor, &raw_time_us) == ESP_OK) {
+            ESP_LOGI("APP", "Raw echo time: %u us", raw_time_us);
+        } else {
+            ESP_LOGE("APP", "Failed to measure raw echo time");
+        }
+
+        // Log memory usage
         size_t free_heap = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
         ESP_LOGI("MEM", "Free heap memory: %d bytes", free_heap);
 

@@ -26,13 +26,33 @@ typedef struct {
 esp_err_t hc_sr04_init(const hc_sr04_t *sensor);
 
 /**
- * @brief Measure distance using the HC-SR04 sensor
+ * @brief Measure time between ping and echo
  * 
  * @param sensor Pointer to the HC-SR04 sensor descriptor
- * @param[out] distance_cm Pointer to store the measured distance in centimeters
+ * @param[out] time_us Time us
  * @return esp_err_t ESP_OK on success, ESP_FAIL on failure
  */
-esp_err_t hc_sr04_measure(const hc_sr04_t *sensor, float *distance_cm);
+esp_err_t hc_sr04_measure_raw(const hc_sr04_t *sensor, uint32_t *time_us);
+
+/**
+ * @brief Measure distance in meters
+ * 
+ * @param sensor Pointer to the sensor descriptor
+ * @param[out] distance Distance in meters
+ * @return esp_err_t ESP_OK on success, ESP_FAIL on failure 
+ */
+esp_err_t hc_sr04_measure_m(const hc_sr04_t *sensor, float *distance);
+
+ /**
+  * @brief Measure distance in centimeters
+  * 
+  * @param sensor Pointer to the sensor descriptor
+  * @param[out] distance Distance in meters
+  * @return esp_err_t ESP_OK on success, ESP_FAIL on failure
+  */
+esp_err_t hc_sr04_measure_cm(const hc_sr04_t *sensor, float *distance);
+
+
 
 #ifdef __cplusplus
 }
